@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const deviceModel = require('../models/device');
+const rtspController = require('../controllers/rtspController');
 
 router.get('/api/devicesinfo', (req, res) => {
   deviceModel.getAllDevices((error, devices) => {
@@ -41,5 +42,14 @@ router.delete('/api/devices/:device_id', (req, res) => {
     return res.status(200).send({ message: 'Device deleted successfully' });
   });
 });
+
+
+router.get('/stream', (req, res) => {
+    const newRtspStreamUrl = req.query.rtsp;
+    rtspController.startRtspStream(newRtspStreamUrl, res);
+});
+
+module.exports = router;
+
 
 module.exports = router;
