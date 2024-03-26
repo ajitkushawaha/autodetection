@@ -1,61 +1,45 @@
-const express = require("express");
-const Stream = require("node-rtsp-stream");
-
+const express = require('express');
 const router = express.Router();
-const streams = {};
+const deviceModel = require('../models/device');
 
-// Endpoint to start a new stream
-router.get("/stream", (req, res) => {
-  const { rtsp, streamId } = req.query;
+router.get('/api/devicesinfo', (req, res) => {
+  deviceModel.getAllDevices((error, devices) => {
+    if (error) return res.status(500).send({ error: 'Internal Server Error' });
+    return res.send({ devices });
+  });
+});
 
-  // Check if RTSP URL and stream ID are provided
-  if (!rtsp || !streamId) {
-    return res.status(400).json({ error: "RTSP URL and stream ID are required." });
-  }
+router.patch('/api/devices/:device_id', (req, res) => {
+  const { device_id } = req.params;
+  const changes = req.body;
 
-  // Check if the stream with the given ID already exists or the RTSP URL has changed
-  if (!streams[streamId] || streams[streamId].streamUrl !== rtsp) {
-    // If the stream with the same ID already exists, stop it
-    if (streams[streamId]) {
-      streams[streamId].stop();
-    }
+  deviceModel.getDeviceById(device_id, (error, device) => {
+    if (error) return res.status(500).send({ error: 'Internal Server Error' });
+    if (!device) return res.status(404).send({ error: 'Device not found' });
 
-    // Create a new RTSP stream
-    streams[streamId] = new Stream({
-      name: `Stream ${streamId}`,
-      streamUrl: rtsp,
-      wsPort: 3030 + parseInt(streamId),
-      ffmpegOptions: {
-        '-stats': '',
-        '-r': 30,
-      },
+    deviceModel.updateDevice(device_id, changes, (error) => {
+      if (error) return res.status(500).send({ error: 'Internal Server Error' });
+      return res.status(200).send({ message: 'Device info updated successfully' });
     });
-  }
-
-  // Respond with the WebSocket URL for the stream
-  res.json({ url: `ws://127.0.0.1:${3030 + parseInt(streamId)}` });
+  });
 });
 
-// Endpoint to stop a stream
-router.get("/stopStream/:streamId", (req, res) => {
-  const { streamId } = req.params;
+router.post('/api/devices', (req, res) => {
+  const deviceData = req.body;
 
-  // Check if the stream with the given ID exists
-  if (streams[streamId]) {
-    // Stop the stream and remove it from the streams object
-    streams[streamId].stop();
-    delete streams[streamId];
-    return res.status(200).json({ message: `Stream ${streamId} stopped.` });
-  }
-
-  // If the stream doesn't exist, return a 404 error
-  return res.status(404).json({ error: `Stream ${streamId} not found.` });
+  deviceModel.addDevice(deviceData, (error) => {
+    if (error) return res.status(500).send({ error: 'Internal Server Error' });
+    return res.status(201).send({ message: 'Device added successfully' });
+  });
 });
 
-// Endpoint to fetch all active streams
-router.get("/streams", (req, res) => {
-  // Respond with an array of active stream URLs
-  res.json({ streams: Object.keys(streams).map(streamId => streams[streamId].streamUrl) });
+router.delete('/api/devices/:device_id', (req, res) => {
+  const { device_id } = req.params;
+
+  deviceModel.deleteDevice(device_id, (error) => {
+    if (error) return res.status(500).send({ error: 'Internal Server Error' });
+    return res.status(200).send({ message: 'Device deleted successfully' });
+  });
 });
 
-module.exports = router
+module.exports = router;
